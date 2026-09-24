@@ -8,7 +8,7 @@ interface HeroCanvasProps {
   onCurrentTime?: (t: number) => void;
 }
 
-const TOTAL_FRAMES = 95;
+const TOTAL_FRAMES = 48;
 
 export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   progressRef,
@@ -27,6 +27,7 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   // Smooth lerp state for 120 FPS motion
   const currentFrameFloatRef = useRef<number>(TOTAL_FRAMES * 0.5); // start at mid pose
   const targetFrameFloatRef = useRef<number>(TOTAL_FRAMES * 0.5);
+  const lastDrawnFrameRef = useRef<number>(-1);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     return typeof window !== 'undefined' && window.innerWidth < 768;
@@ -49,7 +50,8 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
     // Helper to load and decode an image in background thread
     const loadFrame = (idx: number, isPriority = false) => {
       const img = new Image();
-      img.src = `/hero-girl-frames/frame_${String(idx + 1).padStart(3, '0')}.webp`;
+      const sourceFrame = Math.min(idx * 2 + 1, 95);
+      img.src = `/hero-girl-frames/frame_${String(sourceFrame).padStart(3, '0')}.webp`;
       
       const commit = () => {
         if (!isMounted) return;
@@ -79,14 +81,21 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
       if (midIdx + offset < TOTAL_FRAMES) order.push(midIdx + offset);
     }
 
-    order.forEach((idx) => {
-      if (idx !== 0 && idx !== TOTAL_FRAMES - 1 && idx !== midIdx) {
-        loadFrame(idx);
+    const queuedFrames = order.filter(
+      (idx) => idx !== 0 && idx !== TOTAL_FRAMES - 1 && idx !== midIdx
+    );
+    let batchTimer: number | undefined;
+    const loadBatch = () => {
+      queuedFrames.splice(0, 6).forEach((idx) => loadFrame(idx));
+      if (queuedFrames.length > 0 && isMounted) {
+        batchTimer = window.setTimeout(loadBatch, 40);
       }
-    });
+    };
+    loadBatch();
 
     return () => {
       isMounted = false;
+      if (batchTimer !== undefined) window.clearTimeout(batchTimer);
     };
   }, [isCustomVideo]);
 
@@ -94,7 +103,7 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = 1;
     const w = window.innerWidth;
     const h = window.innerHeight;
 
@@ -163,14 +172,15 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
       currentFrameFloatRef.current += diff * lerpSpeed;
 
       const currentFloat = currentFrameFloatRef.current;
-      const floorIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.floor(currentFloat)));
-      const ceilIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.ceil(currentFloat)));
-      const blendFactor = currentFloat - floorIdx;
-
+      const floorIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.round(currentFloat)));
       const floorImg = getBestFrame(floorIdx);
-      const ceilImg = floorIdx === ceilIdx ? null : getBestFrame(ceilIdx);
 
       if (floorImg && floorImg.naturalWidth > 0) {
+        if (lastDrawnFrameRef.current === floorIdx) {
+          rafId = requestAnimationFrame(render);
+          return;
+        }
+        lastDrawnFrameRef.current = floorIdx;
         const cw = canvas.width;
         const ch = canvas.height;
         const imgW = floorImg.naturalWidth;
@@ -223,12 +233,6 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
         ctx.drawImage(floorImg, 0, 0, 1, imgH, 0, 0, cw, ch);
         ctx.drawImage(floorImg, rx, ry, rw, rh);
 
-        // 2. Sub-Frame Crossfade Interpolation (analog continuity between adjacent frames)
-        if (ceilImg && ceilImg !== floorImg && blendFactor > 0.015) {
-          ctx.globalAlpha = blendFactor;
-          ctx.drawImage(ceilImg, rx, ry, rw, rh);
-          ctx.globalAlpha = 1.0;
-        }
       }
 
       rafId = requestAnimationFrame(render);

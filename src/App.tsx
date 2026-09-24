@@ -13,7 +13,6 @@ import { ContactModal } from './components/ContactModal';
 import { AdminModal } from './components/AdminModal';
 import { ChangeVideoModal } from './components/ChangeVideoModal';
 import { HeroCanvas } from './components/HeroCanvas';
-import { ThemeToggle } from './components/ThemeToggle';
 
 // Custom useTypewriter hook:
 // takes text, speed (default 38ms per char), startDelay (default 600ms)
@@ -54,47 +53,18 @@ export const HERO_VIDEO_URL =
 type ModalType = 'about' | 'projects' | 'contact' | 'admin' | 'hello' | 'video' | null;
 
 export default function App() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const targetTimeRef = useRef<number>(0);
   const progressRef = useRef<number>(0.5);
 
   const [activeVideoUrl, setActiveVideoUrl] = useState(HERO_VIDEO_URL);
   const [isCustomVideo, setIsCustomVideo] = useState(false);
   const [contentRevision, setContentRevision] = useState<string | null>(null);
 
-  // Theme State (light vs dark mode for low-light accessibility)
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    try {
-      const saved = localStorage.getItem('samyush_theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        return 'dark';
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return 'light';
-  });
-
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-    }
-    try {
-      localStorage.setItem('samyush_theme', theme);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
+    root.classList.remove('dark');
+    root.setAttribute('data-theme', 'light');
+    localStorage.removeItem('samyush_theme');
+  }, []);
 
   // UI States
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -103,7 +73,6 @@ export default function App() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [helloMessage, setHelloMessage] = useState('');
   const [helloSent, setHelloSent] = useState(false);
-  const [currentTimeDisplay, setCurrentTimeDisplay] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
   const [projects, setProjects] = useState<Project[]>(DEFAULT_PROJECTS);
@@ -200,106 +169,22 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  // Initialize video metadata and set initial frame when activeVideoUrl changes
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handleMeta = () => {
-      if (Number.isFinite(video.duration) && video.duration > 0) {
-        setVideoDuration(video.duration);
-        // Start near center (50%) if video is at start
-        if (video.currentTime === 0) {
-          const mid = video.duration * 0.5;
-          targetTimeRef.current = mid;
-          try {
-            video.currentTime = mid;
-          } catch {
-            // ignore
-          }
-        }
-      }
-    };
-
-    video.addEventListener('loadedmetadata', handleMeta);
-    video.addEventListener('durationchange', handleMeta);
-    video.addEventListener('canplay', handleMeta);
-
-    if (video.readyState >= 1) {
-      handleMeta();
-    } else {
-      try {
-        video.load();
-      } catch {
-        // ignore
-      }
-    }
-
-    return () => {
-      video.removeEventListener('loadedmetadata', handleMeta);
-      video.removeEventListener('durationchange', handleMeta);
-      video.removeEventListener('canplay', handleMeta);
-    };
-  }, [activeVideoUrl]);
-
-  // RequestAnimationFrame loop: continuously & smoothly drives video.currentTime to targetTimeRef
-  useEffect(() => {
-    let rafId: number;
-
-    const tick = () => {
-      const video = videoRef.current;
-      if (video && Number.isFinite(video.duration) && video.duration > 0) {
-        // Only set currentTime if not currently in a native seek to avoid frame drops
-        if (!video.seeking) {
-          const diff = Math.abs(video.currentTime - targetTimeRef.current);
-          if (diff > 0.015) {
-            try {
-              if ('fastSeek' in video && typeof (video as any).fastSeek === 'function') {
-                (video as any).fastSeek(targetTimeRef.current);
-              } else {
-                video.currentTime = targetTimeRef.current;
-              }
-            } catch {
-              // fallback
-            }
-          }
-        }
-        setCurrentTimeDisplay(video.currentTime);
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
-
   // Window-level mouse & touch scrub listener (maps cursor position across screen to video timeline)
   useEffect(() => {
     const handlePointerScrub = (clientX: number) => {
       // Don't scrub if user is interacting inside a modal
       if (activeModal !== null) return;
 
-      const video = videoRef.current;
-      const duration =
-        video && Number.isFinite(video.duration) && video.duration > 0
-          ? video.duration
-          : videoDuration > 0
-          ? videoDuration
-          : 3.5;
+      const duration = videoDuration > 0 ? videoDuration : 3.5;
 
       // Ergonomic 3% margin so you can smoothly reach frame 0 and frame 96 without hitting screen bezels
       const margin = 0.03;
       const norm = (clientX / window.innerWidth - margin) / (1 - 2 * margin);
       const progress = Math.min(Math.max(norm, 0), 1);
       progressRef.current = progress;
-      targetTimeRef.current = progress * duration;
     };
 
     const handlePointerMove = (e: PointerEvent) => {
-      handlePointerScrub(e.clientX);
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
       handlePointerScrub(e.clientX);
     };
 
@@ -309,17 +194,18 @@ export default function App() {
       }
     };
 
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('touchstart', (e) => {
+    const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length > 0) handlePointerScrub(e.touches[0].clientX);
-    }, { passive: true });
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchstart', handleTouchStart);
     };
   }, [activeModal, videoDuration]);
 
@@ -381,7 +267,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden select-none bg-white dark:bg-[#09090b] transition-colors duration-200">
+    <div className="relative w-full h-screen overflow-hidden select-none bg-white">
       {/* 120 FPS HARDWARE-ACCELERATED HERO CANVAS */}
       <div className="absolute inset-0 z-0">
         <HeroCanvas
@@ -389,10 +275,7 @@ export default function App() {
           isCustomVideo={isCustomVideo}
           customVideoUrl={activeVideoUrl}
           onVideoDuration={setVideoDuration}
-          onCurrentTime={setCurrentTimeDisplay}
         />
-        {/* Atmospheric low-light ambient overlay for dark mode */}
-        <div className="absolute inset-0 bg-neutral-950/70 transition-opacity duration-300 pointer-events-none opacity-0 dark:opacity-100" />
       </div>
 
       {/* NAVBAR (fixed, z-index: 20) */}
@@ -447,8 +330,6 @@ export default function App() {
             <span>ADMIN</span>
           </button>
 
-          {/* Theme Toggle Button */}
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </nav>
 
         {/* Compact navigation for phones, tablets, and narrower desktops */}
@@ -456,7 +337,6 @@ export default function App() {
           <button type="button" onClick={() => { setMobileOpen(false); setActiveModal('admin'); }}
             className="min-h-11 px-2 sm:px-3 rounded-lg border border-current text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus-visible:ring-2 focus-visible:ring-amber-400"
             aria-label="Open admin panel">Admin</button>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
@@ -548,9 +428,6 @@ export default function App() {
           </span>
         </a>
 
-        <div className="w-full pt-6 border-t border-neutral-300 dark:border-neutral-800">
-          <ThemeToggle theme={theme} onToggle={toggleTheme} showLabel className="w-full justify-center py-2.5" />
-        </div>
       </div>
 
       {/* HERO SECTION (z-index: 1) */}

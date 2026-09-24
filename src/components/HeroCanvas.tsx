@@ -8,7 +8,7 @@ interface HeroCanvasProps {
   onCurrentTime?: (t: number) => void;
 }
 
-const TOTAL_FRAMES = 97;
+const TOTAL_FRAMES = 95;
 
 export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   progressRef,
@@ -40,17 +40,16 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 1. Preload 97 WebP frames into memory (with background GPU decode for zero-jank scrubbing)
+  // 1. Preload the supplied video’s WebP frames into memory (with background GPU decode for zero-jank scrubbing)
   useEffect(() => {
     if (isCustomVideo) return;
 
     let isMounted = true;
-    const CACHE_BUST = 'v=clean_delogo_final_20260924';
 
     // Helper to load and decode an image in background thread
     const loadFrame = (idx: number, isPriority = false) => {
       const img = new Image();
-      img.src = `/frames/frame_${String(idx + 1).padStart(3, '0')}.webp?${CACHE_BUST}`;
+      img.src = `/hero-girl-frames/frame_${String(idx + 1).padStart(3, '0')}.webp`;
       
       const commit = () => {
         if (!isMounted) return;
@@ -204,8 +203,8 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
             desiredScreenRatio = 0.62;
           }
 
-          // In source video, the girl's center is at 64% (0.64) of the video width
-          rx = (cw * desiredScreenRatio) - (rw * 0.64);
+          // In source video, the girl's center is at 54% (0.54) of the video width
+          rx = (cw * desiredScreenRatio) - (rw * 0.54);
 
           // Clamping to avoid edge gaps
           if (rx + rw < cw) {
@@ -232,29 +231,7 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
           ctx.globalAlpha = 1.0;
         }
 
-        // 3. Seamless watermark suppression: clone clean studio backdrop over bottom-right watermark region
-        const wmX = rx + rw * (930 / 1280);
-        const wmY = ry + rh * (630 / 724);
-        const wmW = rw * (350 / 1280);
-        const wmH = rh * (94 / 724);
-        if (wmX < cw && wmY < ch) {
-          const sampleY = Math.max(wmY - 26, 0);
-          try {
-            ctx.drawImage(
-              canvas,
-              wmX,
-              sampleY,
-              Math.min(wmW, cw - wmX),
-              24,
-              wmX,
-              wmY,
-              Math.min(wmW, cw - wmX),
-              Math.min(wmH, ch - wmY)
-            );
-          } catch {
-            // ignore
-          }
-        }
+
       }
 
       rafId = requestAnimationFrame(render);

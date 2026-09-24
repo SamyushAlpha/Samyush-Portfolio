@@ -53,7 +53,7 @@ export function useTypewriter(text: string, speed = 38, startDelay = 600) {
 
 // Hero background scrub video URL (clean watermark-free local video)
 export const HERO_VIDEO_URL =
-  import.meta.env.VITE_HERO_VIDEO_URL || '/hero_clean.mp4';
+  import.meta.env.VITE_HERO_VIDEO_URL || '/hero-girl.mp4';
 
 type ModalType = 'about' | 'projects' | 'contact' | 'admin' | 'hello' | 'video' | null;
 

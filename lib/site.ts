@@ -7,10 +7,10 @@ export async function readSite() {
   const content = await new Response(result.stream).json();
   return { ...content, revision: result.blob.etag };
 }
-export async function writeSite(content: any, revision: string | null) {
+export async function writeSite(content: any) {
   const blob = await put(CONTENT_PATH, JSON.stringify(content), {
     access: 'private', contentType: 'application/json', addRandomSuffix: false,
-    ...(revision ? { ifMatch: revision } : { allowOverwrite: false }),
+    allowOverwrite: true,
   });
   return { ...content, revision: blob.etag };
 }

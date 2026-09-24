@@ -8,7 +8,7 @@ interface HeroCanvasProps {
   onCurrentTime?: (t: number) => void;
 }
 
-const TOTAL_FRAMES = 48;
+const TOTAL_FRAMES = 95;
 
 export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   progressRef,
@@ -24,9 +24,6 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   const framesRef = useRef<(HTMLImageElement | null)[]>(new Array(TOTAL_FRAMES).fill(null));
   const [initialFrameReady, setInitialFrameReady] = useState(false);
 
-  // Smooth lerp state for 120 FPS motion
-  const currentFrameFloatRef = useRef<number>(TOTAL_FRAMES * 0.5); // start at mid pose
-  const targetFrameFloatRef = useRef<number>(TOTAL_FRAMES * 0.5);
   const lastDrawnFrameRef = useRef<number>(-1);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -50,12 +47,12 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
     // Helper to load and decode an image in background thread
     const loadFrame = (idx: number, isPriority = false) => {
       const img = new Image();
-      const sourceFrame = Math.min(idx * 2 + 1, 95);
-      img.src = `/hero-girl-frames/frame_${String(sourceFrame).padStart(3, '0')}.webp`;
+      img.src = `/hero-girl-frames/frame_${String(idx + 1).padStart(3, '0')}.webp`;
       
       const commit = () => {
         if (!isMounted) return;
         framesRef.current[idx] = img;
+        lastDrawnFrameRef.current = -1;
         if (isPriority) {
           setInitialFrameReady(true);
         }
@@ -86,9 +83,9 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
     );
     let batchTimer: number | undefined;
     const loadBatch = () => {
-      queuedFrames.splice(0, 6).forEach((idx) => loadFrame(idx));
+      queuedFrames.splice(0, 12).forEach((idx) => loadFrame(idx));
       if (queuedFrames.length > 0 && isMounted) {
-        batchTimer = window.setTimeout(loadBatch, 40);
+        batchTimer = window.setTimeout(loadBatch, 20);
       }
     };
     loadBatch();
@@ -119,26 +116,26 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
     return () => window.removeEventListener('resize', resizeCanvas);
   }, [resizeCanvas]);
 
-  // 3. Ultra-smooth 120+ FPS render loop with Adaptive Dynamic Inertia & Sub-Frame Crossfade
+  // 3. Draw the frame that directly matches the pointer position.
   useEffect(() => {
     if (isCustomVideo) return;
 
     let rafId: number;
 
     // Fast helper to get nearest available decoded frame
-    const getBestFrame = (idx: number): HTMLImageElement | null => {
+    const getBestFrame = (idx: number): { image: HTMLImageElement; index: number } | null => {
       const direct = framesRef.current[idx];
-      if (direct && direct.complete && direct.naturalWidth > 0) return direct;
+      if (direct && direct.complete && direct.naturalWidth > 0) return { image: direct, index: idx };
       for (let offset = 1; offset < TOTAL_FRAMES; offset++) {
         const prev = idx - offset;
         const next = idx + offset;
         if (prev >= 0) {
           const pImg = framesRef.current[prev];
-          if (pImg && pImg.complete && pImg.naturalWidth > 0) return pImg;
+          if (pImg && pImg.complete && pImg.naturalWidth > 0) return { image: pImg, index: prev };
         }
         if (next < TOTAL_FRAMES) {
           const nImg = framesRef.current[next];
-          if (nImg && nImg.complete && nImg.naturalWidth > 0) return nImg;
+          if (nImg && nImg.complete && nImg.naturalWidth > 0) return { image: nImg, index: next };
         }
       }
       return null;
@@ -157,30 +154,19 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
         return;
       }
 
-      // Map progress to target float frame
-      const target = Math.min(
-        Math.max(progressRef.current * (TOTAL_FRAMES - 1), 0),
-        TOTAL_FRAMES - 1
+      const requestedIndex = Math.max(
+        0,
+        Math.min(TOTAL_FRAMES - 1, Math.round(progressRef.current * (TOTAL_FRAMES - 1)))
       );
-      targetFrameFloatRef.current = target;
+      const frame = getBestFrame(requestedIndex);
 
-      // Adaptive Dynamic Inertia:
-      // Silky, velvet smooth dampening on slow tracking; dynamically accelerates on rapid flicks
-      const diff = targetFrameFloatRef.current - currentFrameFloatRef.current;
-      const absDiff = Math.abs(diff);
-      const lerpSpeed = Math.min(0.28, 0.13 + absDiff * 0.004);
-      currentFrameFloatRef.current += diff * lerpSpeed;
-
-      const currentFloat = currentFrameFloatRef.current;
-      const floorIdx = Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.round(currentFloat)));
-      const floorImg = getBestFrame(floorIdx);
-
-      if (floorImg && floorImg.naturalWidth > 0) {
-        if (lastDrawnFrameRef.current === floorIdx) {
+      if (frame) {
+        if (lastDrawnFrameRef.current === frame.index) {
           rafId = requestAnimationFrame(render);
           return;
         }
-        lastDrawnFrameRef.current = floorIdx;
+        lastDrawnFrameRef.current = frame.index;
+        const floorImg = frame.image;
         const cw = canvas.width;
         const ch = canvas.height;
         const imgW = floorImg.naturalWidth;

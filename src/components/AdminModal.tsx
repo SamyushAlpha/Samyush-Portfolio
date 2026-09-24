@@ -3,23 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Project } from '../types/project';
 import { formatVideoUrl } from '../utils/videoStorage';
 
 interface AdminModalProps {
   projects: Project[];
   onClose: () => void;
-  onAddProject: (project: Omit<Project, 'id'>) => void;
-  onUpdateProject: (id: string, project: Partial<Project>) => void;
-  onDeleteProject: (id: string) => void;
-  onResetDefaults: () => void;
+  onAddProject: (project: Omit<Project, 'id'>) => Promise<void>;
+  onUpdateProject: (id: string, project: Partial<Project>) => Promise<void>;
+  onDeleteProject: (id: string) => Promise<void>;
+  onResetDefaults: () => Promise<void>;
   // Hero Video Management Props
   currentVideoUrl?: string;
   isCustomVideo?: boolean;
-  onSaveVideoUrl?: (url: string) => void;
+  onSaveVideoUrl?: (url: string) => Promise<void>;
   onSaveVideoFile?: (file: File) => Promise<void> | void;
   onResetVideoDefault?: () => Promise<void> | void;
+  onUploadImage: (file: File) => Promise<string>;
 }
 
 // Curated high-aesthetic architecture presets for instant selection
@@ -49,23 +50,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   onUpdateProject,
   onDeleteProject,
   onResetDefaults,
-  currentVideoUrl = '/hero_clean.mp4',
+  currentVideoUrl = '/hero-girl.mp4',
   isCustomVideo = false,
   onSaveVideoUrl,
   onSaveVideoFile,
   onResetVideoDefault,
+  onUploadImage,
 }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('samyush_admin_auth') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [passcode, setPasscode] = useState('');
   const [authError, setAuthError] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'video'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'manage' | 'video'>('manage');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Video Management State
@@ -96,42 +93,48 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    fetch('/api/session', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((result) => setIsAuthenticated(Boolean(result.authenticated)))
+      .finally(() => setAuthChecking(false));
+  }, []);
+
   // Show transient notification
   const showToast = (msg: string) => {
     setNotification(msg);
     window.setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleUnlock = (e?: React.FormEvent) => {
+  const handleUnlock = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (passcode.trim() === 'mylo@244456') {
+    setAuthError(false);
+    const response = await fetch('/api/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: passcode }),
+    });
+    if (response.ok) {
       setIsAuthenticated(true);
-      try {
-        sessionStorage.setItem('samyush_admin_auth', 'true');
-      } catch (err) {
-        console.error(err);
-      }
-      setAuthError(false);
     } else {
       setAuthError(true);
     }
   };
 
   // Image upload via FileReader
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         showToast('Please choose an image under 5MB.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setImagePreview(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        setImagePreview(await onUploadImage(file));
+        showToast('Project image uploaded. Save the project to publish it.');
+      } catch {
+        showToast('Image upload failed. Please sign in again and retry.');
+      }
     }
   };
 
@@ -171,7 +174,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const techArray = techInput
@@ -194,16 +197,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       featured,
     };
 
-    if (editingId) {
-      onUpdateProject(editingId, projectPayload);
-      showToast(`Updated "${title}" successfully!`);
-    } else {
-      onAddProject(projectPayload);
-      showToast(`Uploaded "${title}" to portfolio!`);
+    try {
+      if (editingId) {
+        await onUpdateProject(editingId, projectPayload);
+        showToast(`Updated "${title}" for every visitor!`);
+      } else {
+        await onAddProject(projectPayload);
+        showToast(`Published "${title}" for every visitor!`);
+      }
+      handleResetForm();
+      setActiveTab('manage');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not publish project.');
     }
-
-    handleResetForm();
-    setActiveTab('manage');
   };
 
   // Video Management Handlers
@@ -249,7 +255,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
   };
 
-  const handleVideoUrlSubmit = (e: React.FormEvent) => {
+  const handleVideoUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!videoUrlInput.trim()) {
       setVideoError('Please enter a valid video link.');
@@ -257,8 +263,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
     const formatted = formatVideoUrl(videoUrlInput);
     setVideoError(null);
-    onSaveVideoUrl?.(formatted);
-    showToast('Hero background video URL applied!');
+    try {
+      await onSaveVideoUrl?.(formatted);
+      showToast('Hero video published for every visitor!');
+    } catch (error) {
+      setVideoError(error instanceof Error ? error.message : 'Could not publish video.');
+    }
   };
 
   const handleVideoReset = async () => {
@@ -278,7 +288,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       <button
         type="button"
         onClick={onClose}
-        className="absolute -top-3 -right-2 sm:-top-4 sm:-right-4 z-20 w-9 h-9 rounded-full bg-white dark:bg-[#18181b] text-black dark:text-white border-2 border-black dark:border-[#e5b364] flex items-center justify-center text-sm font-bold shadow-[2px_2px_0px_var(--shadow-3d-main)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer focus:outline-none"
+        className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-white dark:bg-[#18181b] text-black dark:text-white border-2 border-black dark:border-[#e5b364] flex items-center justify-center text-sm font-bold shadow-[2px_2px_0px_var(--shadow-3d-main)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer focus:outline-none"
         aria-label="Close admin panel"
       >
         ✕
@@ -286,14 +296,16 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
       {/* Outer Neobrutalist Shadow Box Wrapper */}
       <div
-        className="w-full bg-[#fbf9f5] dark:bg-[#121215] border-[2.5px] sm:border-[3px] border-[#18181b] dark:border-[#3f3f46] rounded-[28px] sm:rounded-[36px] p-6 sm:p-10 md:p-12 transition-all text-neutral-900 dark:text-neutral-100"
+        className="w-full bg-[#fbf9f5] dark:bg-[#121215] border-[2.5px] sm:border-[3px] border-[#18181b] dark:border-[#3f3f46] rounded-[28px] sm:rounded-[36px] p-4 pt-16 sm:p-8 sm:pt-16 transition-all text-neutral-900 dark:text-neutral-100"
         style={{
           boxShadow: '12px 14px 0px var(--shadow-3d-main)',
         }}
       >
         {/* Passcode Security Gate */}
-        {!isAuthenticated ? (
-          <div className="py-8 px-4 text-center max-w-md mx-auto">
+        {authChecking ? (
+          <div className="py-12 text-center font-mono text-sm">Checking secure admin session…</div>
+        ) : !isAuthenticated ? (
+          <div className="py-4 text-center max-w-md mx-auto">
             <div className="w-14 h-14 rounded-2xl bg-[#18181b] dark:bg-[#121215] text-[#e5b364] flex items-center justify-center text-2xl mx-auto mb-4 border-2 border-[#18181b] dark:border-[#e5b364] shadow-[3px_3px_0px_var(--shadow-3d-main)]">
               🔒
             </div>
@@ -315,6 +327,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   setPasscode(e.target.value);
                   setAuthError(false);
                 }}
+                aria-label="Admin password"
+                autoComplete="current-password"
                 placeholder="Enter admin password"
                 className="w-full h-12 bg-white dark:bg-[#18181b] border-2 border-[#18181b] dark:border-[#3f3f46] text-[#18181b] dark:text-[#f4f4f5] text-center font-mono text-sm tracking-widest focus:outline-none focus:border-[#e5b364]"
                 autoFocus
@@ -349,10 +363,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   fontFamily: 'var(--font-heading)',
                 }}
               >
-                PROJECT ADMIN
+                WEBSITE ADMIN
               </h1>
               <div className="text-[10px] sm:text-[11px] font-mono tracking-[0.34em] uppercase text-[#3f3f46] dark:text-[#a1a1aa] mt-2">
-                UPLOAD & MANAGE PORTFOLIO ARTIFACTS
+                PROJECTS & BACKGROUND VIDEO
               </div>
             </div>
 
@@ -416,8 +430,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   type="button"
                   onClick={() => {
                     if (window.confirm('Reset all projects back to original curated portfolio showcase?')) {
-                      onResetDefaults();
-                      showToast('Reset catalog to curated defaults.');
+                      onResetDefaults()
+                        .then(() => showToast('Published the default project catalog.'))
+                        .catch((error) => showToast(error instanceof Error ? error.message : 'Could not reset projects.'));
                     }
                   }}
                   className="text-[11px] font-mono uppercase tracking-wider text-[#71717a] dark:text-[#a1a1aa] hover:text-[#18181b] dark:hover:text-white underline cursor-pointer"
@@ -684,7 +699,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
 
                 {/* Submit & Reset Buttons with 3D lift */}
-                <div className="flex gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row gap-4 pt-2">
                   <button
                     type="submit"
                     className="btn-3d-gold flex-1 h-12 border-2 border-[#18181b] bg-[#e5b364] text-[#18181b] font-mono text-xs font-bold tracking-[0.24em] uppercase flex items-center justify-center cursor-pointer"
@@ -719,8 +734,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       key={p.id}
                       className="bg-white border-2 border-[#18181b] p-4 rounded-xl shadow-[3px_3px_0px_#18181b] flex flex-col sm:flex-row justify-between sm:items-center gap-3"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                      <div className="space-y-1 min-w-0 break-words">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-sm text-[#18181b]">
                             {p.title}
                           </span>
@@ -738,11 +753,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => handleEditClick(p)}
-                          className="btn-3d-white px-3 py-1.5 border border-[#18181b] bg-[#f4f4f5] text-[#18181b] rounded text-xs font-mono font-bold cursor-pointer"
+                          className="btn-3d-white px-3 min-h-11 py-1.5 border border-[#18181b] bg-[#f4f4f5] text-[#18181b] rounded text-xs font-mono font-bold cursor-pointer"
                         >
                           Edit
                         </button>
@@ -750,19 +765,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => {
-                                onDeleteProject(p.id);
-                                setDeleteConfirmId(null);
-                                showToast(`✓ Deleted "${p.title}".`);
+                              onClick={async () => {
+                                try {
+                                  await onDeleteProject(p.id);
+                                  setDeleteConfirmId(null);
+                                  showToast(`Deleted "${p.title}" for every visitor.`);
+                                } catch (error) {
+                                  showToast(error instanceof Error ? error.message : 'Could not delete project.');
+                                }
                               }}
-                              className="px-3 py-1.5 border-2 border-red-700 bg-red-600 text-white rounded text-xs font-mono font-bold hover:bg-red-700 shadow-[2px_2px_0px_#7f1d1d] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
+                              className="px-3 min-h-11 py-1.5 border-2 border-red-700 bg-red-600 text-white rounded text-xs font-mono font-bold hover:bg-red-700 shadow-[2px_2px_0px_#7f1d1d] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap"
                             >
                               Confirm Delete
                             </button>
                             <button
                               type="button"
                               onClick={() => setDeleteConfirmId(null)}
-                              className="px-2.5 py-1.5 border border-[#18181b] bg-white text-[#18181b] rounded text-xs font-mono font-bold hover:bg-neutral-100 transition-colors cursor-pointer"
+                              className="px-2.5 min-h-11 py-1.5 border border-[#18181b] bg-white text-[#18181b] rounded text-xs font-mono font-bold hover:bg-neutral-100 transition-colors cursor-pointer"
                               title="Cancel deletion"
                             >
                               ✕
@@ -772,7 +791,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setDeleteConfirmId(p.id)}
-                            className="px-3 py-1.5 border border-red-600 bg-red-50 text-red-700 rounded text-xs font-mono font-bold hover:bg-red-600 hover:text-white active:scale-95 transition-all cursor-pointer"
+                            className="px-3 min-h-11 py-1.5 border border-red-600 bg-red-50 text-red-700 rounded text-xs font-mono font-bold hover:bg-red-600 hover:text-white active:scale-95 transition-all cursor-pointer"
                           >
                             Delete
                           </button>

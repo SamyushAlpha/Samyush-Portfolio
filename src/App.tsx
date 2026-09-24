@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { upload } from '@vercel/blob/client';
 import { Project } from './types/project';
 import { DEFAULT_PROJECTS } from './data/defaultProjects';
 import { AboutModal } from './components/AboutModal';
@@ -13,11 +14,6 @@ import { AdminModal } from './components/AdminModal';
 import { ChangeVideoModal } from './components/ChangeVideoModal';
 import { HeroCanvas } from './components/HeroCanvas';
 import { ThemeToggle } from './components/ThemeToggle';
-import {
-  saveVideoBlob,
-  loadSavedVideoBlob,
-  clearSavedVideo,
-} from './utils/videoStorage';
 
 // Custom useTypewriter hook:
 // takes text, speed (default 38ms per char), startDelay (default 600ms)
@@ -62,76 +58,9 @@ export default function App() {
   const targetTimeRef = useRef<number>(0);
   const progressRef = useRef<number>(0.5);
 
-  // Active Video URL & custom status
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem('samyush_custom_video_url');
-      if (saved && !saved.includes('d8j0ntlcm91z4.cloudfront.net')) return saved;
-    } catch (e) {
-      // ignore
-    }
-    return HERO_VIDEO_URL;
-  });
-  const [isCustomVideo, setIsCustomVideo] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('samyush_custom_video_url');
-      return Boolean(saved && !saved.includes('d8j0ntlcm91z4.cloudfront.net'));
-    } catch {
-      return false;
-    }
-  });
-
-  // Check if there is an IndexedDB stored video file
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    loadSavedVideoBlob().then((blob) => {
-      if (blob) {
-        objectUrl = URL.createObjectURL(blob);
-        setActiveVideoUrl(objectUrl);
-        setIsCustomVideo(true);
-      }
-    });
-
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, []);
-
-  const handleSaveVideoUrl = (url: string) => {
-    try {
-      localStorage.setItem('samyush_custom_video_url', url);
-    } catch (e) {
-      console.error(e);
-    }
-    clearSavedVideo();
-    setActiveVideoUrl(url);
-    setIsCustomVideo(true);
-  };
-
-  const handleSaveVideoFile = async (file: File) => {
-    try {
-      await saveVideoBlob(file);
-      const objUrl = URL.createObjectURL(file);
-      localStorage.removeItem('samyush_custom_video_url');
-      setActiveVideoUrl(objUrl);
-      setIsCustomVideo(true);
-    } catch (e) {
-      console.error('Failed to store video file:', e);
-    }
-  };
-
-  const handleResetVideoDefault = async () => {
-    try {
-      localStorage.removeItem('samyush_custom_video_url');
-      await clearSavedVideo();
-      setActiveVideoUrl(HERO_VIDEO_URL);
-      setIsCustomVideo(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const [activeVideoUrl, setActiveVideoUrl] = useState(HERO_VIDEO_URL);
+  const [isCustomVideo, setIsCustomVideo] = useState(false);
+  const [contentRevision, setContentRevision] = useState<string | null>(null);
 
   // Theme State (light vs dark mode for low-light accessibility)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -177,57 +106,83 @@ export default function App() {
   const [currentTimeDisplay, setCurrentTimeDisplay] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
-  // Projects Catalog with persistent localStorage
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem('samyush_projects');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error('Error loading projects from storage:', e);
-    }
-    return DEFAULT_PROJECTS;
-  });
+  const [projects, setProjects] = useState<Project[]>(DEFAULT_PROJECTS);
 
-  // Save to localStorage whenever projects change
   useEffect(() => {
-    try {
-      localStorage.setItem('samyush_projects', JSON.stringify(projects));
-    } catch (e) {
-      console.error('Error saving projects to storage:', e);
-    }
-  }, [projects]);
+    fetch('/api/content', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not load website content');
+        return response.json();
+      })
+      .then((content) => {
+        if (Array.isArray(content.projects)) setProjects(content.projects);
+        const videoUrl = typeof content.videoUrl === 'string' ? content.videoUrl : HERO_VIDEO_URL;
+        setActiveVideoUrl(videoUrl);
+        setIsCustomVideo(videoUrl !== HERO_VIDEO_URL);
+        setContentRevision(content.revision || null);
+      })
+      .catch((error) => console.error(error));
+  }, []);
+
+  const publishContent = async (nextProjects: Project[], nextVideoUrl: string | null) => {
+    const response = await fetch('/api/content', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects: nextProjects, videoUrl: nextVideoUrl, revision: contentRevision }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not publish website changes.');
+    setProjects(result.projects);
+    setActiveVideoUrl(result.videoUrl || HERO_VIDEO_URL);
+    setIsCustomVideo(Boolean(result.videoUrl));
+    setContentRevision(result.revision || null);
+  };
 
   // Project Admin Operations
-  const handleAddProject = (newProj: Omit<Project, 'id'>) => {
+  const handleAddProject = async (newProj: Omit<Project, 'id'>) => {
     const projectWithId: Project = {
       ...newProj,
       id: `proj_${Date.now()}`,
     };
-    setProjects((prev) => [projectWithId, ...prev]);
+    await publishContent([projectWithId, ...projects], isCustomVideo ? activeVideoUrl : null);
   };
 
-  const handleUpdateProject = (id: string, updated: Partial<Project>) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
-    );
+  const handleUpdateProject = async (id: string, updated: Partial<Project>) => {
+    await publishContent(projects.map((p) => (p.id === id ? { ...p, ...updated } : p)), isCustomVideo ? activeVideoUrl : null);
   };
 
-  const handleDeleteProject = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  const handleDeleteProject = async (id: string) => {
+    await publishContent(projects.filter((p) => p.id !== id), isCustomVideo ? activeVideoUrl : null);
   };
 
-  const handleResetDefaults = () => {
-    setProjects(DEFAULT_PROJECTS);
-    try {
-      localStorage.removeItem('samyush_projects');
-    } catch (e) {
-      console.error(e);
-    }
+  const handleResetDefaults = async () => {
+    await publishContent(DEFAULT_PROJECTS, isCustomVideo ? activeVideoUrl : null);
+  };
+
+  const handleSaveVideoUrl = async (url: string) => {
+    await publishContent(projects, url);
+  };
+
+  const handleSaveVideoFile = async (file: File) => {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const blob = await upload(`media/${safeName}`, file, {
+      access: 'private',
+      handleUploadUrl: '/api/upload',
+    });
+    await publishContent(projects, `/api/media?path=${encodeURIComponent(blob.pathname)}`);
+  };
+
+  const handleUploadImage = async (file: File) => {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const blob = await upload(`media/${safeName}`, file, {
+      access: 'private',
+      handleUploadUrl: '/api/upload',
+    });
+    return `/api/media?path=${encodeURIComponent(blob.pathname)}`;
+  };
+
+  const handleResetVideoDefault = async () => {
+    await publishContent(projects, null);
   };
 
   // Typewriter text
@@ -441,7 +396,7 @@ export default function App() {
       </div>
 
       {/* NAVBAR (fixed, z-index: 20) */}
-      <header className="fixed top-0 left-0 right-0 z-20 w-full px-5 sm:px-8 py-5 sm:py-6 flex justify-between items-center pointer-events-auto">
+      <header className="fixed top-0 left-0 right-0 z-20 w-full px-4 sm:px-6 py-4 sm:py-5 flex gap-3 justify-between items-center pointer-events-auto">
         {/* Brand Logo (left): Samyush Gautam (Double-click to open Admin) */}
         <div className="flex items-center">
           <button
@@ -449,7 +404,7 @@ export default function App() {
             onClick={() => {}}
             onDoubleClick={() => setActiveModal('admin')}
             style={{ fontFamily: 'var(--font-heading)' }}
-            className="text-[22px] sm:text-[28px] font-extrabold tracking-[-0.03em] text-neutral-900 dark:text-neutral-100 cursor-pointer hover:opacity-75 transition-colors whitespace-nowrap focus:outline-none"
+            className="text-[16px] min-[400px]:text-[19px] sm:text-[24px] xl:text-[28px] font-extrabold tracking-[-0.03em] text-neutral-900 dark:text-neutral-100 cursor-pointer hover:opacity-75 transition-colors whitespace-nowrap focus:outline-none"
             title="Samyush Gautam"
           >
             Samyush Gautam
@@ -458,7 +413,7 @@ export default function App() {
 
         {/* Desktop nav links: ABOUT, PROJECTS, CONTACT, ADMIN, THEME TOGGLE */}
         <nav
-          className="hidden md:flex items-center gap-6 lg:gap-8 text-[13px] sm:text-[14px] font-semibold tracking-[0.22em] uppercase text-neutral-900 dark:text-neutral-200"
+          className="hidden xl:flex items-center gap-5 text-[13px] sm:text-[14px] font-semibold tracking-[0.22em] uppercase text-neutral-900 dark:text-neutral-200"
           style={{ fontFamily: 'var(--font-heading)' }}
           aria-label="Main navigation"
         >
@@ -486,7 +441,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setActiveModal('admin')}
-            className="text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white transition-all hover:-translate-y-0.5 cursor-pointer focus:outline-none flex items-center gap-1.5"
+            className="min-h-11 px-3 rounded-lg border border-current text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400 flex items-center gap-1.5"
             title="Admin & Hero Video Management"
           >
             <span>ADMIN</span>
@@ -496,8 +451,11 @@ export default function App() {
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </nav>
 
-        {/* Mobile top-right: Theme Toggle + Hamburger button */}
-        <div className="md:hidden flex items-center gap-3">
+        {/* Compact navigation for phones, tablets, and narrower desktops */}
+        <div className="xl:hidden flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => { setMobileOpen(false); setActiveModal('admin'); }}
+            className="min-h-11 px-2 sm:px-3 rounded-lg border border-current text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus-visible:ring-2 focus-visible:ring-amber-400"
+            aria-label="Open admin panel">Admin</button>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <button
             type="button"
@@ -527,7 +485,7 @@ export default function App() {
 
       {/* MOBILE OVERLAY (z-index: 15) */}
       <div
-        className={`fixed inset-0 bg-[#fbf9f5]/98 dark:bg-[#0d0d10]/98 backdrop-blur-md z-[15] flex flex-col justify-center items-start px-8 gap-8 md:hidden transition-all duration-300 ${
+        className={`fixed inset-0 bg-[#fbf9f5]/98 dark:bg-[#0d0d10]/98 backdrop-blur-md z-[15] flex flex-col justify-center items-start px-6 gap-5 xl:hidden overflow-y-auto py-24 transition-all duration-300 ${
           mobileOpen
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'
@@ -866,6 +824,7 @@ export default function App() {
                 onSaveVideoUrl={handleSaveVideoUrl}
                 onSaveVideoFile={handleSaveVideoFile}
                 onResetVideoDefault={handleResetVideoDefault}
+                onUploadImage={handleUploadImage}
               />
             )}
 

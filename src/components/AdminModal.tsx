@@ -844,9 +844,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <span className="text-[#18181b] dark:text-[#f4f4f5] font-medium">
                           {isCustomVideo
                             ? currentVideoUrl.startsWith('blob:')
-                              ? 'Locally Uploaded Video (Saved in IndexedDB)'
+                              ? 'Published shared video (private storage)'
                               : currentVideoUrl
-                            : 'Studio Interactive Frames (/hero_clean.mp4)'}
+                            : 'Girl interactive frames (/hero-girl.mp4)'}
                         </span>
                       </div>
                     </div>
@@ -877,7 +877,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         1. Upload Video File
                       </div>
                       <p className="text-xs text-[#52525b] dark:text-[#a1a1aa] mb-4">
-                        Upload your custom MP4, WebM, or MOV video. Persists in IndexedDB for instant offline scrubbing.
+                        Upload an MP4, WebM, or MOV video. Saving publishes it for every website visitor.
                       </p>
 
                       <div

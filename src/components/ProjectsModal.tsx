@@ -10,7 +10,6 @@ import { Project, ProjectCategory } from '../types/project';
 interface ProjectsModalProps {
   projects: Project[];
   onClose: () => void;
-  onOpenAdmin: () => void;
   onOpenContact: () => void;
 }
 
@@ -34,7 +33,6 @@ const cardVariants: Variants = {
 export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   projects,
   onClose,
-  onOpenAdmin,
   onOpenContact,
 }) => {
   const [filter, setFilter] = useState<ProjectCategory>('all');

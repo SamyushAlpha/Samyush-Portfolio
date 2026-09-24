@@ -77,6 +77,45 @@
   --btn-dark-hover-bg: #18181b;
 }
 
+/* Keep the hero readable on phones rotated into a short landscape viewport. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero-main {
+    justify-content: center;
+    padding: 58px 24px 44px;
+  }
+
+  .hero-copy {
+    max-width: 390px;
+  }
+
+  .hero-lines {
+    min-height: 112px !important;
+    margin-bottom: 6px !important;
+  }
+
+  .hero-lines > div {
+    font-size: 15px !important;
+    line-height: 1.08 !important;
+  }
+
+  .hero-lines > div:nth-child(3) {
+    font-size: 34px !important;
+    line-height: 0.98 !important;
+    margin: 4px 0 !important;
+  }
+
+  .hero-pills {
+    max-width: 390px;
+    gap: 2px 0;
+  }
+
+  .hero-pills button {
+    font-size: 12px !important;
+    padding: 2px 12px !important;
+    margin-bottom: 5px !important;
+  }
+}
+
 body {
   font-family: var(--font-body);
   margin: 0;

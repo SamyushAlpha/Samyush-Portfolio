@@ -27,12 +27,12 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
   const lastDrawnFrameRef = useRef<number>(-1);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && window.innerWidth < 768;
+    return typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 768;
   });
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(Math.min(window.innerWidth, window.innerHeight) < 768);
     };
     window.addEventListener('resize', handleResize, { passive: true });
     return () => window.removeEventListener('resize', handleResize);

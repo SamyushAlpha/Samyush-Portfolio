@@ -294,7 +294,7 @@ export default function App() {
           </button>
         </div>
 
-        {/* Desktop nav links: ABOUT, PROJECTS, CONTACT, ADMIN, THEME TOGGLE */}
+        {/* Desktop navigation links */}
         <nav
           className="hidden xl:flex items-center gap-5 text-[13px] sm:text-[14px] font-semibold tracking-[0.22em] uppercase text-neutral-900 dark:text-neutral-200"
           style={{ fontFamily: 'var(--font-heading)' }}
@@ -321,22 +321,10 @@ export default function App() {
           >
             CONTACT
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveModal('admin')}
-            className="min-h-11 px-3 rounded-lg border border-current text-neutral-700 dark:text-neutral-200 hover:text-black dark:hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400 flex items-center gap-1.5"
-            title="Admin & Hero Video Management"
-          >
-            <span>ADMIN</span>
-          </button>
-
         </nav>
 
         {/* Compact navigation for phones, tablets, and narrower desktops */}
         <div className="xl:hidden flex shrink-0 items-center gap-2">
-          <button type="button" onClick={() => { setMobileOpen(false); setActiveModal('admin'); }}
-            className="min-h-11 px-2 sm:px-3 rounded-lg border border-current text-xs font-semibold text-neutral-900 dark:text-neutral-100 focus-visible:ring-2 focus-visible:ring-amber-400"
-            aria-label="Open admin panel">Admin</button>
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
@@ -402,20 +390,6 @@ export default function App() {
         >
           CONTACT
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMobileOpen(false);
-            setActiveModal('admin');
-          }}
-          className="text-[26px] font-normal tracking-[0.2em] uppercase text-neutral-500 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:opacity-60 transition-opacity text-left cursor-pointer flex items-center gap-3"
-        >
-          <span>ADMIN</span>
-          <span className="text-xs font-mono uppercase bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 px-2 py-0.5 rounded">
-            Video & Projects
-          </span>
-        </button>
-
         <a
           href="https://www.instagram.com/samyush_gautam/"
           target="_blank"
@@ -431,12 +405,12 @@ export default function App() {
       </div>
 
       {/* HERO SECTION (z-index: 1) */}
-      <main className="h-screen w-full flex flex-col justify-end pb-12 md:justify-center md:pb-0 px-5 sm:px-8 md:px-10 overflow-hidden relative z-[1]">
+      <main className="hero-main h-screen w-full flex flex-col justify-end pb-12 md:justify-center md:pb-0 px-5 sm:px-8 md:px-10 overflow-hidden relative z-[1]">
         {/* Content container */}
-        <div className="max-w-md sm:max-w-lg md:max-w-[480px] lg:max-w-[540px] relative z-10">
+        <div className="hero-copy max-w-md sm:max-w-lg md:max-w-[480px] lg:max-w-[540px] relative z-10">
           {/* Stacked Hero Text (Welcome / My name is / Samyush Gautam / Full Stack Developer) */}
           <div
-            className="mb-4 sm:mb-6 select-none flex flex-col items-start"
+            className="hero-lines mb-4 sm:mb-6 select-none flex flex-col items-start"
             style={{
               fontFamily: 'var(--font-heading)',
               minHeight: '160px',
@@ -497,7 +471,7 @@ export default function App() {
 
           {/* 3. Action pill buttons (Tactile 3D Hover Lift) */}
           <div
-            className={`flex flex-wrap gap-y-1 ${
+            className={`hero-pills flex flex-wrap gap-y-1 ${
               pillsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
             }`}
             style={{
@@ -673,7 +647,6 @@ export default function App() {
               <ProjectsModal
                 projects={projects}
                 onClose={closeModal}
-                onOpenAdmin={() => setActiveModal('admin')}
                 onOpenContact={() => setActiveModal('contact')}
               />
             )}

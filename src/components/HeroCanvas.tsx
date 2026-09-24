@@ -210,9 +210,6 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
           if (rx + rw < cw) {
             rx = cw - rw;
           }
-          if (rx > 0) {
-            rx = 0;
-          }
           ry = 0;
         }
 
@@ -222,6 +219,8 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
 
         // 1. Primary Base Frame (100% opacity)
         ctx.globalAlpha = 1.0;
+        // Extend the studio backdrop when positioning the subject beside the text.
+        ctx.drawImage(floorImg, 0, 0, 1, imgH, 0, 0, cw, ch);
         ctx.drawImage(floorImg, rx, ry, rw, rh);
 
         // 2. Sub-Frame Crossfade Interpolation (analog continuity between adjacent frames)
@@ -230,8 +229,6 @@ export const HeroCanvas: React.FC<HeroCanvasProps> = ({
           ctx.drawImage(ceilImg, rx, ry, rw, rh);
           ctx.globalAlpha = 1.0;
         }
-
-
       }
 
       rafId = requestAnimationFrame(render);

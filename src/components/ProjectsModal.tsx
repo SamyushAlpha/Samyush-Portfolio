@@ -305,7 +305,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
                       }}
                       className="text-xs font-mono uppercase tracking-wider underline text-[#18181b] dark:text-[#f4f4f5] hover:opacity-70 cursor-pointer font-bold"
                     >
-                      Architecture Notes →
+                      Case Study →
                     </button>
 
                     <div className="flex items-center gap-2">

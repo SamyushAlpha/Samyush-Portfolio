@@ -1,0 +1,6 @@
+{
+  "name": "Mainframe",
+  "description": "Full-screen interactive hero landing page for creative agency Mainframe featuring mouse-scrubbed video and intelligent interface agent A.R.I.A.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

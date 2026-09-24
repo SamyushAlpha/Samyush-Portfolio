@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
+
+:root {
+  --font-heading: 'Syne', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Space Grotesk', monospace;
+
+  /* Theme surface & text tokens */
+  --bg-app: #ffffff;
+  --bg-modal: #fbf9f5;
+  --bg-card: #ffffff;
+  --text-main: #18181b;
+  --text-muted: #71717a;
+  --border-strong: #18181b;
+
+  /* 3D Tactile Shadows: Crisp obsidian #18181b in Light Mode */
+  --shadow-3d-main: #18181b;
+  --shadow-3d-ambient: rgba(0, 0, 0, 0.25);
+  --shadow-3d-ambient-hover: rgba(0, 0, 0, 0.45);
+
+  --pill-bg: #ffffff;
+  --pill-text: #000000;
+  --pill-border: rgba(0, 0, 0, 0.15);
+  --pill-hover-bg: #ffffff;
+  --pill-hover-text: #000000;
+
+  --pill-outline-bg: #ffffff;
+  --pill-outline-border: #18181b;
+  --pill-outline-text: #000000;
+
+  --btn-white-bg: #ffffff;
+  --btn-white-text: #18181b;
+  --btn-white-border: rgba(24, 24, 27, 0.3);
+  --btn-white-hover-bg: #f4f4f5;
+
+  --btn-dark-bg: #18181b;
+  --btn-dark-text: #ffffff;
+  --btn-dark-border: #18181b;
+  --btn-dark-hover-bg: #27272a;
+}
+
+/* Dark mode theme adjustments: deep rich black backdrop with radiant amber gold 3D shadow depth */
+.dark,
+[data-theme="dark"] {
+  --bg-app: #09090b;
+  --bg-modal: #121215;
+  --bg-card: #18181b;
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --border-strong: #3f3f46;
+
+  /* 3D Tactile Shadows: Radiant warm amber-gold #e5b364 in Dark Mode for high contrast & accessibility */
+  --shadow-3d-main: #e5b364;
+  --shadow-3d-ambient: rgba(0, 0, 0, 0.65);
+  --shadow-3d-ambient-hover: rgba(229, 179, 100, 0.35);
+
+  --pill-bg: #18181b;
+  --pill-text: #ffffff;
+  --pill-border: #3f3f46;
+  --pill-hover-bg: #24242a;
+  --pill-hover-text: #ffffff;
+
+  --pill-outline-bg: #121215;
+  --pill-outline-border: #e5b364;
+  --pill-outline-text: #ffffff;
+
+  --btn-white-bg: #222227;
+  --btn-white-text: #f4f4f5;
+  --btn-white-border: #3f3f46;
+  --btn-white-hover-bg: #2d2d34;
+
+  --btn-dark-bg: #09090b;
+  --btn-dark-text: #ffffff;
+  --btn-dark-border: #e5b364;
+  --btn-dark-hover-bg: #18181b;
+}
+
+body {
+  font-family: var(--font-body);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* ========================================================================= */
+/* TACTILE 3D BUTTONS: ADAPTIVE SHADOW COLORS & LIFT ACROSS LIGHT / DARK */
+/* ========================================================================= */
+
+/* 3D White Pill buttons on Hero */
+.pill-3d-white {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transform: translateY(0);
+  background-color: var(--pill-bg);
+  color: var(--pill-text);
+  border-color: var(--pill-border);
+  box-shadow: 0 4px 0px var(--shadow-3d-main), 0 5px 10px var(--shadow-3d-ambient);
+  cursor: pointer;
+  will-change: transform, box-shadow;
+}
+
+.pill-3d-white:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 10px 0px var(--shadow-3d-main), 0 16px 24px var(--shadow-3d-ambient-hover);
+  background-color: var(--pill-hover-bg);
+  color: var(--pill-hover-text);
+}
+
+.pill-3d-white:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0px var(--shadow-3d-main), 0 2px 4px var(--shadow-3d-ambient);
+}
+
+/* 3D Outline Pill button on Hero */
+.pill-3d-outline {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transform: translateY(0);
+  background-color: var(--pill-outline-bg);
+  border-color: var(--pill-outline-border);
+  color: var(--pill-outline-text);
+  box-shadow: 0 4px 0px var(--shadow-3d-main), 0 6px 12px var(--shadow-3d-ambient);
+  cursor: pointer;
+  will-change: transform, box-shadow;
+}
+
+.pill-3d-outline:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 10px 0px var(--shadow-3d-main), 0 16px 24px var(--shadow-3d-ambient-hover);
+  background-color: var(--pill-outline-bg);
+  color: var(--pill-outline-text);
+}
+
+.pill-3d-outline:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0px var(--shadow-3d-main), 0 2px 4px var(--shadow-3d-ambient);
+  color: var(--pill-outline-text);
+}
+
+/* 3D Gold Accent Button */
+.btn-3d-gold {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.16s ease;
+  transform: translateY(0);
+  box-shadow: 0 4px 0px var(--shadow-3d-main), 0 6px 10px var(--shadow-3d-ambient);
+  will-change: transform, box-shadow;
+}
+
+.btn-3d-gold:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 9px 0px var(--shadow-3d-main), 0 15px 20px var(--shadow-3d-ambient-hover);
+  background-color: #dba352;
+}
+
+.btn-3d-gold:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0px var(--shadow-3d-main), 0 2px 4px var(--shadow-3d-ambient);
+}
+
+/* 3D White / Neutral Button */
+.btn-3d-white {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transform: translateY(0);
+  background-color: var(--btn-white-bg);
+  color: var(--btn-white-text);
+  border-color: var(--btn-white-border);
+  box-shadow: 0 4px 0px var(--shadow-3d-main), 0 6px 10px var(--shadow-3d-ambient);
+  will-change: transform, box-shadow;
+}
+
+.btn-3d-white:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 9px 0px var(--shadow-3d-main), 0 15px 20px var(--shadow-3d-ambient-hover);
+  background-color: var(--btn-white-hover-bg);
+}
+
+.btn-3d-white:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0px var(--shadow-3d-main), 0 2px 4px var(--shadow-3d-ambient);
+}
+
+/* 3D Dark Button */
+.btn-3d-dark {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  transform: translateY(0);
+  background-color: var(--btn-dark-bg);
+  color: var(--btn-dark-text);
+  border-color: var(--btn-dark-border);
+  box-shadow: 0 4px 0px var(--shadow-3d-main), 0 6px 10px var(--shadow-3d-ambient);
+  will-change: transform, box-shadow;
+}
+
+.btn-3d-dark:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 9px 0px var(--shadow-3d-main), 0 15px 22px var(--shadow-3d-ambient-hover);
+  background-color: var(--btn-dark-hover-bg);
+}
+
+.btn-3d-dark:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0px var(--shadow-3d-main), 0 2px 4px var(--shadow-3d-ambient);
+}
+
+/* Standard 3D card/item lift */
+.card-3d-lift {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card-3d-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 0px var(--shadow-3d-main), 0 18px 24px var(--shadow-3d-ambient-hover);
+}
+
+/* Modal Neobrutalist Box */
+.modal-neobrutalist-box {
+  background-color: var(--bg-modal);
+  border-color: var(--border-strong);
+  box-shadow: 12px 14px 0px var(--shadow-3d-main);
+  color: var(--text-main);
+}
